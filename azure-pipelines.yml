@@ -1,0 +1,55 @@
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  nodeVersion: '18.x'
+
+stages:
+- stage: Build
+  displayName: Build
+  jobs:
+  - job: BuildApp
+    displayName: Build React App
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: $(nodeVersion)
+      displayName: 'Install Node.js'
+
+    - script: npm install
+      displayName: 'npm install'
+
+    - script: npm run build
+      displayName: 'npm run build'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Build Artifacts'
+      inputs:
+        pathToPublish: 'dist'
+        artifactName: 'drop'
+        publishLocation: 'Container'
+
+- stage: Deploy
+  displayName: Deploy to Static Web App
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: DeployStaticWebApp
+    displayName: Deploy to smart-assign-frontend
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'drop'
+        downloadPath: '$(System.ArtifactsDirectory)'
+
+    - task: AzureStaticWebApp@0
+      inputs:
+        workingDirectory: '$(System.ArtifactsDirectory)/drop'
+        app_location: '/'
+        skip_app_build: true
+        azure_static_web_apps_api_token: $(deployment_token)
