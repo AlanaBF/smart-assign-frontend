@@ -3,6 +3,10 @@ import { describe, it, expect, vi } from 'vitest'
 import '@testing-library/jest-dom'
 import ErrorBoundary from '../components/ErrorBoundary'
 
+function ThrowingComponent(): never {
+  throw new Error('Test error')
+}
+
 describe('ErrorBoundary', () => {
   it('renders children when no error', () => {
     render(
@@ -14,12 +18,7 @@ describe('ErrorBoundary', () => {
   })
 
   it('shows error UI when child component throws', () => {
-    // Suppress React error boundary console errors in test output
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    function ThrowingComponent(): never {
-      throw new Error('Test error')
-    }
 
     render(
       <ErrorBoundary>

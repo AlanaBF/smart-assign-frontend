@@ -39,8 +39,8 @@ export default function ManualSearch() {
     if (currentFilters.grade !== 'Any') params.grade = currentFilters.grade
     if (currentFilters.clearance !== 'Any') params.clearance = currentFilters.clearance
     if (currentFilters.availability !== 'Any') {
-      const match = currentFilters.availability.match(/\d+/)
-      if (match) params.availability = parseInt(match[0])
+      const match = /\d+/.exec(currentFilters.availability)
+      if (match) params.availability = Number.parseInt(match[0])
     }
     if (currentFilters.role) params.role = currentFilters.role
     if (currentFilters.skill) params.skill = currentFilters.skill
