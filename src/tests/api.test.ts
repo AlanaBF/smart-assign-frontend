@@ -102,8 +102,6 @@ describe('api service - getCandidates', () => {
       skill: '',
     })
 
-    // grade, role, skill are empty strings (falsy) and should not appear
-    // country is undefined and should not appear
     expect(getSpy).toHaveBeenCalledWith('/candidates', {
       params: { page: 1, limit: 25 },
     })
