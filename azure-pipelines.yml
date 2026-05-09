@@ -9,24 +9,62 @@ trigger:
     include:
       - main
 
-jobs:
-- job: build_and_deploy_job
-  displayName: Build and Deploy Job
-  condition: or(eq(variables['Build.Reason'], 'Manual'),or(eq(variables['Build.Reason'], 'PullRequest'),eq(variables['Build.Reason'], 'IndividualCI')))
-  pool:
-    vmImage: ubuntu-latest
-  variables:
-  - group: Azure-Static-Web-Apps-lemon-ground-01cb01d03-variable-group
-  steps:
-  - checkout: self
-    submodules: true
-  - task: NodeTool@0
-    inputs:
-      versionSpec: '20.x'
-    displayName: 'Install Node.js'
-  - task: AzureStaticWebApp@0
-    inputs:
-      azure_static_web_apps_api_token: $(AZURE_STATIC_WEB_APPS_API_TOKEN_LEMON_GROUND_01CB01D03)
-      app_location: "/"
-      api_location: ""
-      output_location: "dist"
+stages:
+- stage: Test
+  displayName: Run Tests
+  jobs:
+  - job: RunTests
+    displayName: Run Vitest
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - checkout: self
+      submodules: true
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '20.x'
+      displayName: 'Install Node.js'
+    - script: npm ci
+      displayName: Install dependencies
+    - script: npm test
+      displayName: Run tests
+    - script: npm audit --audit-level=high
+      displayName: Security audit (npm audit)
+    - task: SonarCloudPrepare@3
+      inputs:
+        SonarCloud: 'Smart Assign'
+        organization: 'alanabf'
+        scannerMode: 'CLI'
+        configMode: 'manual'
+        cliProjectKey: 'AlanaBF_smart-assign-frontend'
+        cliSources: 'src'
+    - task: SonarCloudAnalyze@3
+      displayName: Run SonarCloud analysis
+    - task: SonarCloudPublish@3
+      displayName: Publish SonarCloud results
+
+- stage: Deploy
+  displayName: Build and Deploy
+  dependsOn: Test
+  condition: succeeded()
+  jobs:
+  - job: build_and_deploy_job
+    displayName: Build and Deploy Job
+    condition: or(eq(variables['Build.Reason'], 'Manual'),or(eq(variables['Build.Reason'], 'PullRequest'),eq(variables['Build.Reason'], 'IndividualCI')))
+    pool:
+      vmImage: ubuntu-latest
+    variables:
+    - group: Azure-Static-Web-Apps-lemon-ground-01cb01d03-variable-group
+    steps:
+    - checkout: self
+      submodules: true
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '20.x'
+      displayName: 'Install Node.js'
+    - task: AzureStaticWebApp@0
+      inputs:
+        azure_static_web_apps_api_token: $(AZURE_STATIC_WEB_APPS_API_TOKEN_LEMON_GROUND_01CB01D03)
+        app_location: "/"
+        api_location: ""
+        output_location: "dist"
