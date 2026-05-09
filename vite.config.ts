@@ -14,5 +14,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    coverage: {
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/tests/**', 'src/main.tsx', 'src/vite-env.d.ts'],
+    },
   },
 })
