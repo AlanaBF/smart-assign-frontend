@@ -26,8 +26,8 @@ stages:
       displayName: 'Install Node.js'
     - script: npm ci
       displayName: Install dependencies
-    - script: npm test
-      displayName: Run tests
+    - script: npx vitest run --coverage
+      displayName: Run tests with coverage
     - script: npm audit --audit-level=high
       displayName: Security audit (npm audit)
     - task: SonarCloudPrepare@3
@@ -38,6 +38,8 @@ stages:
         configMode: 'manual'
         cliProjectKey: 'AlanaBF_smart-assign-frontend'
         cliSources: 'src'
+        extraProperties: |
+          sonar.javascript.lcov.reportPaths=coverage/lcov.info
     - task: SonarCloudAnalyze@3
       displayName: Run SonarCloud analysis
     - task: SonarCloudPublish@3
