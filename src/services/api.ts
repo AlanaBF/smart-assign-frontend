@@ -20,16 +20,9 @@ export interface CandidateFilters {
 }
 
 export async function getCandidates(filters: CandidateFilters = {}): Promise<CandidatesResponse> {
-  const params: Record<string, string | number> = {}
-
-  if (filters.page) params.page = filters.page
-  if (filters.limit) params.limit = filters.limit
-  if (filters.country) params.country = filters.country
-  if (filters.grade) params.grade = filters.grade
-  if (filters.clearance) params.clearance = filters.clearance
-  if (filters.availability !== undefined) params.availability = filters.availability
-  if (filters.role) params.role = filters.role
-  if (filters.skill) params.skill = filters.skill
+  const params = Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  )
 
   const { data } = await apiClient.get<CandidatesResponse>('/candidates', { params })
   return data

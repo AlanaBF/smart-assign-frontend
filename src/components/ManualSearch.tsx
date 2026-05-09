@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Candidate } from '../types/candidate'
 import { getCandidates, type CandidateFilters } from '../services/api'
+import Pagination from './Pagination'
 
 const CLEARANCE_OPTIONS = ['Any', 'SC', 'DV', 'NPPV2', 'None']
 const AVAILABILITY_OPTIONS = ['Any', '>= 25%', '>= 50%', '>= 75%']
 const COUNTRY_OPTIONS = ['Any', 'Australia', 'Ireland', 'Spain', 'UK', 'USA']
+const GRADE_OPTIONS = ['Any', 'CPD1E', 'CPD1M', 'CPD1L', 'CPD2E', 'CPD2M', 'CPD2L', 'CPD3E', 'CPD3M', 'CPD3L', 'CPD4E', 'CPD4M', 'CPD4L', 'CPD5E', 'CPD5M', 'CPD5L']
 const PAGE_SIZE = 25
 
 const defaultFilters = {
@@ -16,7 +18,34 @@ const defaultFilters = {
   skill: '',
 }
 
-const selectClass = 'px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500'
+const filterInputClass = 'px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500'
+
+const FILTER_FIELDS = [
+  { label: 'Location', key: 'country' as const, type: 'select' as const, options: COUNTRY_OPTIONS },
+  { label: 'Grade', key: 'grade' as const, type: 'select' as const, options: GRADE_OPTIONS },
+  { label: 'SC Clearance', key: 'clearance' as const, type: 'select' as const, options: CLEARANCE_OPTIONS },
+  { label: 'Availability', key: 'availability' as const, type: 'select' as const, options: AVAILABILITY_OPTIONS },
+  { label: 'Role', key: 'role' as const, type: 'text' as const, options: [] },
+  { label: 'Skills', key: 'skill' as const, type: 'text' as const, options: [] },
+]
+
+function extractAvailabilityPercentage(value: string): number | undefined {
+  const match = /\d+/.exec(value)
+  return match ? Number.parseInt(match[0]) : undefined
+}
+
+function buildFilterParams(currentFilters: typeof defaultFilters, currentPage: number): CandidateFilters {
+  const params: CandidateFilters = { page: currentPage, limit: PAGE_SIZE }
+
+  if (currentFilters.country !== 'Any') params.country = currentFilters.country
+  if (currentFilters.grade !== 'Any') params.grade = currentFilters.grade
+  if (currentFilters.clearance !== 'Any') params.clearance = currentFilters.clearance
+  if (currentFilters.availability !== 'Any') params.availability = extractAvailabilityPercentage(currentFilters.availability)
+  if (currentFilters.role) params.role = currentFilters.role
+  if (currentFilters.skill) params.skill = currentFilters.skill
+
+  return params
+}
 
 export default function ManualSearch() {
   const [filters, setFilters] = useState(defaultFilters)
@@ -30,23 +59,8 @@ export default function ManualSearch() {
     setLoading(true)
     setError(null)
 
-    const params: CandidateFilters = {
-      page: currentPage,
-      limit: PAGE_SIZE,
-    }
-
-    if (currentFilters.country !== 'Any') params.country = currentFilters.country
-    if (currentFilters.grade !== 'Any') params.grade = currentFilters.grade
-    if (currentFilters.clearance !== 'Any') params.clearance = currentFilters.clearance
-    if (currentFilters.availability !== 'Any') {
-      const match = /\d+/.exec(currentFilters.availability)
-      if (match) params.availability = Number.parseInt(match[0])
-    }
-    if (currentFilters.role) params.role = currentFilters.role
-    if (currentFilters.skill) params.skill = currentFilters.skill
-
     try {
-      const response = await getCandidates(params)
+      const response = await getCandidates(buildFilterParams(currentFilters, currentPage))
       setCandidates(response.candidates)
       setTotal(response.total)
     } catch (err) {
@@ -60,26 +74,17 @@ export default function ManualSearch() {
     fetchCandidates(filters, page)
   }, [filters, page, fetchCandidates])
 
-  function setFilter(key: keyof typeof defaultFilters, value: string) {
+  function handleFilterChange(key: keyof typeof defaultFilters, value: string) {
     setFilters(prev => ({ ...prev, [key]: value }))
     setPage(1)
   }
 
-  function resetFilters() {
+  function handleResetFilters() {
     setFilters(defaultFilters)
     setPage(1)
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
-
-  const filterFields = [
-    { label: 'Location', key: 'country' as const, type: 'select' as const, options: COUNTRY_OPTIONS },
-    { label: 'Grade', key: 'grade' as const, type: 'select' as const, options: ['Any', 'CPD1E', 'CPD1M', 'CPD1L', 'CPD2E', 'CPD2M', 'CPD2L', 'CPD3E', 'CPD3M', 'CPD3L', 'CPD4E', 'CPD4M', 'CPD4L', 'CPD5E', 'CPD5M', 'CPD5L'] },
-    { label: 'SC Clearance', key: 'clearance' as const, type: 'select' as const, options: CLEARANCE_OPTIONS },
-    { label: 'Availability', key: 'availability' as const, type: 'select' as const, options: AVAILABILITY_OPTIONS },
-    { label: 'Role', key: 'role' as const, type: 'text' as const, options: [] },
-    { label: 'Skills', key: 'skill' as const, type: 'text' as const, options: [] },
-  ]
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -92,14 +97,14 @@ export default function ManualSearch() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
-        {filterFields.map(({ label, key, type, options }) => (
+        {FILTER_FIELDS.map(({ label, key, type, options }) => (
           <div key={label} className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</label>
             {type === 'select' ? (
               <select
                 value={filters[key]}
-                onChange={event => setFilter(key, event.target.value)}
-                className={selectClass}
+                onChange={event => handleFilterChange(key, event.target.value)}
+                className={filterInputClass}
               >
                 {options.map(option => (
                   <option key={option} value={option}>{option}</option>
@@ -109,9 +114,9 @@ export default function ManualSearch() {
               <input
                 type="text"
                 value={filters[key]}
-                onChange={event => setFilter(key, event.target.value)}
+                onChange={event => handleFilterChange(key, event.target.value)}
                 placeholder={`Search ${label.toLowerCase()}...`}
-                className={selectClass}
+                className={filterInputClass}
               />
             )}
           </div>
@@ -121,7 +126,7 @@ export default function ManualSearch() {
       <div className="mb-6 flex justify-end">
         <button
           type="button"
-          onClick={resetFilters}
+          onClick={handleResetFilters}
           className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50"
         >
           Reset filters
@@ -137,27 +142,7 @@ export default function ManualSearch() {
           {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
 
-        {totalPages > 1 && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1 || loading}
-              className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages || loading}
-              className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              Next
-            </button>
-          </div>
-        )}
+        <Pagination currentPage={page} totalPages={totalPages} loading={loading} onPageChange={setPage} />
       </div>
 
       {candidates.length > 0 && (
@@ -199,29 +184,9 @@ export default function ManualSearch() {
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="mt-4 flex justify-center">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1 || loading}
-              className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages || loading}
-              className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <div className="mt-4 flex justify-center">
+        <Pagination currentPage={page} totalPages={totalPages} loading={loading} onPageChange={setPage} />
+      </div>
     </div>
   )
 }
