@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import '@testing-library/jest-dom'
 import ErrorBoundary from '../components/ErrorBoundary'
@@ -29,6 +29,26 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Something went wrong')).toBeInTheDocument()
     expect(screen.getByText('An unexpected error occurred.')).toBeInTheDocument()
     expect(screen.getByText('Reload page')).toBeInTheDocument()
+
+    spy.mockRestore()
+  })
+
+  it('reloads the page when the reload button is clicked', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const reloadMock = vi.fn()
+    Object.defineProperty(globalThis, 'location', {
+      value: { reload: reloadMock },
+      writable: true,
+    })
+
+    render(
+      <ErrorBoundary>
+        <ThrowingComponent />
+      </ErrorBoundary>
+    )
+
+    fireEvent.click(screen.getByText('Reload page'))
+    expect(reloadMock).toHaveBeenCalled()
 
     spy.mockRestore()
   })
