@@ -74,7 +74,7 @@ export default function ManualSearch() {
 
   const filterFields = [
     { label: 'Location', key: 'country' as const, type: 'select' as const, options: COUNTRY_OPTIONS },
-    { label: 'Grade', key: 'grade' as const, type: 'select' as const, options: ['Any', 'CPD3E', 'CPD3L', 'CPD4E', 'CPD4L', 'CPD5'] },
+    { label: 'Grade', key: 'grade' as const, type: 'select' as const, options: ['Any', 'CPD1E', 'CPD1M', 'CPD1L', 'CPD2E', 'CPD2M', 'CPD2L', 'CPD3E', 'CPD3M', 'CPD3L', 'CPD4E', 'CPD4M', 'CPD4L', 'CPD5E', 'CPD5M', 'CPD5L'] },
     { label: 'SC Clearance', key: 'clearance' as const, type: 'select' as const, options: CLEARANCE_OPTIONS },
     { label: 'Availability', key: 'availability' as const, type: 'select' as const, options: AVAILABILITY_OPTIONS },
     { label: 'Role', key: 'role' as const, type: 'text' as const, options: [] },
