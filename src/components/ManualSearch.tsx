@@ -1,111 +1,119 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { Candidate } from '../types/candidate'
+import { getCandidates, type CandidateFilters } from '../services/api'
 
-interface Props {
-  candidates: Candidate[]
-  loading: boolean
-  error: string | null
-}
-
-const CLEARANCE_OPTIONS = ['Any', 'SC', 'DV', 'NPPV2']
+const CLEARANCE_OPTIONS = ['Any', 'SC', 'DV', 'NPPV2', 'None']
 const AVAILABILITY_OPTIONS = ['Any', '>= 25%', '>= 50%', '>= 75%']
-
-function meetsAvailability(candidate: Candidate, filter: string) {
-  if (filter === '>= 25%') return candidate.availability >= 25
-  if (filter === '>= 50%') return candidate.availability >= 50
-  if (filter === '>= 75%') return candidate.availability >= 75
-  return true
-}
+const COUNTRY_OPTIONS = ['Any', 'Australia', 'Ireland', 'Spain', 'UK', 'USA']
+const PAGE_SIZE = 25
 
 const defaultFilters = {
-  location: 'Any',
+  country: 'Any',
   grade: 'Any',
   clearance: 'Any',
   availability: 'Any',
-  role: 'Any',
-  skill: 'Any',
+  role: '',
+  skill: '',
 }
 
 const selectClass = 'px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500'
 
-export default function ManualSearch({ candidates, loading, error }: Props) {
+export default function ManualSearch() {
   const [filters, setFilters] = useState(defaultFilters)
+  const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchCandidates = useCallback(async (currentFilters: typeof defaultFilters, currentPage: number) => {
+    setLoading(true)
+    setError(null)
+
+    const params: CandidateFilters = {
+      page: currentPage,
+      limit: PAGE_SIZE,
+    }
+
+    if (currentFilters.country !== 'Any') params.country = currentFilters.country
+    if (currentFilters.grade !== 'Any') params.grade = currentFilters.grade
+    if (currentFilters.clearance !== 'Any') params.clearance = currentFilters.clearance
+    if (currentFilters.availability !== 'Any') {
+      const match = currentFilters.availability.match(/\d+/)
+      if (match) params.availability = parseInt(match[0])
+    }
+    if (currentFilters.role) params.role = currentFilters.role
+    if (currentFilters.skill) params.skill = currentFilters.skill
+
+    try {
+      const response = await getCandidates(params)
+      setCandidates(response.candidates)
+      setTotal(response.total)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load candidates')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchCandidates(filters, page)
+  }, [filters, page, fetchCandidates])
 
   function setFilter(key: keyof typeof defaultFilters, value: string) {
     setFilters(prev => ({ ...prev, [key]: value }))
+    setPage(1)
   }
 
   function resetFilters() {
     setFilters(defaultFilters)
+    setPage(1)
   }
 
-  const dropdownOptions = useMemo(() => {
-    const locations = new Set<string>()
-    const grades = new Set<string>()
-    const roles = new Set<string>()
-    const skills = new Set<string>()
-
-    for (const candidate of candidates) {
-      if (candidate.country) locations.add(candidate.country)
-      if (candidate.department) grades.add(candidate.department)
-      if (candidate.latest_cv_title) roles.add(candidate.latest_cv_title)
-      if (candidate.skills) {
-        candidate.skills.split(',').forEach(skill => {
-          const trimmed = skill.trim()
-          if (trimmed) skills.add(trimmed)
-        })
-      }
-    }
-
-    return {
-      locations: ['Any', ...Array.from(locations).sort()],
-      grades: ['Any', ...Array.from(grades).sort()],
-      roles: ['Any', ...Array.from(roles).sort()],
-      skills: ['Any', ...Array.from(skills).sort()],
-    }
-  }, [candidates])
-
-  const visibleCandidates = useMemo(() => candidates.filter(candidate =>
-    (filters.location === 'Any' || candidate.country === filters.location) &&
-    (filters.grade === 'Any' || candidate.department === filters.grade) &&
-    (filters.clearance === 'Any' || candidate.clearance === filters.clearance) &&
-    (filters.role === 'Any' || candidate.latest_cv_title === filters.role) &&
-    (filters.skill === 'Any' || candidate.skills?.toLowerCase().includes(filters.skill.toLowerCase())) &&
-    meetsAvailability(candidate, filters.availability)
-  ), [candidates, filters])
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   const filterFields = [
-    { label: 'Location', key: 'location' as const, options: dropdownOptions.locations },
-    { label: 'Grade', key: 'grade' as const, options: dropdownOptions.grades },
-    { label: 'SC Clearance', key: 'clearance' as const, options: CLEARANCE_OPTIONS },
-    { label: 'Availability', key: 'availability' as const, options: AVAILABILITY_OPTIONS },
-    { label: 'Role', key: 'role' as const, options: dropdownOptions.roles },
-    { label: 'Skills', key: 'skill' as const, options: dropdownOptions.skills },
+    { label: 'Location', key: 'country' as const, type: 'select' as const, options: COUNTRY_OPTIONS },
+    { label: 'Grade', key: 'grade' as const, type: 'select' as const, options: ['Any', 'CPD3E', 'CPD3L', 'CPD4E', 'CPD4L', 'CPD5'] },
+    { label: 'SC Clearance', key: 'clearance' as const, type: 'select' as const, options: CLEARANCE_OPTIONS },
+    { label: 'Availability', key: 'availability' as const, type: 'select' as const, options: AVAILABILITY_OPTIONS },
+    { label: 'Role', key: 'role' as const, type: 'text' as const, options: [] },
+    { label: 'Skills', key: 'skill' as const, type: 'text' as const, options: [] },
   ]
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <div className="flex items-center gap-2 mb-6">
         <div className="p-2 bg-blue-600 rounded-full flex items-center justify-center">
-          <span className="text-white text-2xl">🔍</span>
+          <span className="text-white text-2xl">&#128269;</span>
         </div>
         <h2 className="text-lg font-semibold text-gray-900">Manual Search & Filter</h2>
         <span className="text-sm text-gray-500">Filter candidates using dropdown selections</span>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
-        {filterFields.map(({ label, key, options }) => (
+        {filterFields.map(({ label, key, type, options }) => (
           <div key={label} className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</label>
-            <select
-              value={filters[key]}
-              onChange={event => setFilter(key, event.target.value)}
-              className={selectClass}
-            >
-              {options.map(option => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
+            {type === 'select' ? (
+              <select
+                value={filters[key]}
+                onChange={event => setFilter(key, event.target.value)}
+                className={selectClass}
+              >
+                {options.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={filters[key]}
+                onChange={event => setFilter(key, event.target.value)}
+                placeholder={`Search ${label.toLowerCase()}...`}
+                className={selectClass}
+              />
+            )}
           </div>
         ))}
       </div>
@@ -120,15 +128,39 @@ export default function ManualSearch({ candidates, loading, error }: Props) {
         </button>
       </div>
 
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">
-          Candidates ({loading ? '…' : visibleCandidates.length})
-        </h3>
-        {loading && <p className="text-sm text-gray-500">Loading candidates...</p>}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Candidates ({loading ? '...' : total})
+          </h3>
+          {loading && <p className="text-sm text-gray-500">Loading candidates...</p>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1 || loading}
+              className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-600">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || loading}
+              className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
-      {visibleCandidates.length > 0 && (
+      {candidates.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -141,7 +173,7 @@ export default function ManualSearch({ candidates, loading, error }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {visibleCandidates.map(candidate => (
+              {candidates.map(candidate => (
                 <tr key={candidate.user_id} className="hover:bg-gray-50 transition-colors duration-150">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">{candidate.full_name}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">{candidate.country}</td>
@@ -161,9 +193,33 @@ export default function ManualSearch({ candidates, loading, error }: Props) {
         </div>
       )}
 
-      {!loading && visibleCandidates.length === 0 && candidates.length > 0 && (
+      {!loading && candidates.length === 0 && (
         <div className="bg-gray-50 rounded-lg p-8 text-center text-gray-500">
           No candidates match your current filters. Try adjusting your selections.
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex justify-center">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1 || loading}
+              className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-600">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || loading}
+              className="px-3 py-1 text-sm rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

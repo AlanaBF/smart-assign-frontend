@@ -10,3 +10,10 @@ export interface Candidate {
   clearance: string | null
   years_experience: number | null
 }
+
+export interface CandidatesResponse {
+  candidates: Candidate[]
+  total: number
+  page: number
+  limit: number
+}
